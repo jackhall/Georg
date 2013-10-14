@@ -1,7 +1,7 @@
 #!/usr/bin/csi -s
 
-; ; ; ezxdisp version
-(use ezxdisp)
+(use sdl)
+(use cairo)
 (include "mathh-constants")
 
 (define difference
@@ -41,44 +41,83 @@
           (cdr A))))))
 
 (define rule
-  (lambda (draw-unit)
+  (lambda (draw-unit move-to)
     (let ((rule-unit (sqrt 10))
           (rule-angle (atan (/ 3))))
       (lambda (A B)
         (let* ((a (rotate-and-scale-down A B rule-angle rule-unit))
-               (b (rotate-and-scale-down A B (- rule-angle PI/4) rule-unit)))
+               (b (rotate-and-scale-down A B (- rule-angle PI/4) rule-unit))
                (c (rotate a b PI/2))
-               (d (rotate b a (- PI/2)))
+               (d (rotate b a (- PI/2))))
             (draw-unit A a)
             (draw-unit a b)
-            (draw-unit a c)
             (draw-unit b d)
-            (draw-unit c d)
-            (draw-unit d B))))))
+            (draw-unit d B) ; now move back to "a"
+            (move-to a)
+            (draw-unit a c)
+            (draw-unit c d))))))
 
-(define image 
-  (ezx-init 640 480 "fractal"))
-(ezx-set-background image (make-ezx-color 1 1 1))
-(define color
-  (make-ezx-color 0 0 0))
+(define create-sdl-context
+  (lambda (maxx maxy)
+    (sdl-init SDL_INIT_EVERYTHING)
+    (sdl-wm-set-caption "fractal" "fractal")
+    (let ((s (sdl-set-video-mode maxx maxy 0 (+ SDL_HWSURFACE
+                                                SDL_HWPALETTE
+                                                SDL_DOUBLEBUF))))
+      (sdl-fill-rect s 
+                     (make-sdl-rect 0 0 maxx maxy) 
+                     (sdl-map-rgb (sdl-surface-pixel-format s) 0 0 0))
+      (sdl-flip s)
+      s)))
 
-(define draw-segment
-  (lambda (A B)
-    (ezx-line-2d image (car A) (cdr A) (car B) (cdr B) color)))
+(define create-cairo-context
+  (lambda (s maxx maxy)
+    (let ((context (cairo-create 
+                     (cairo-image-surface-create-for-data
+                       (sdl-surface-pixels s)
+                       CAIRO_FORMAT_RGB24 maxx maxy
+                       (sdl-surface-pitch s)))))
+      (cairo-set-source-rgba context 1 1 1 1)
+      (cairo-set-line-width context 1)
+      (cairo-new-path context)
+      context)))
 
 (define draw-fractal
   (lambda (depth start end)
-    ((let layer ((depth depth))
-       (if (= depth 0)
-         (rule draw-segment)
-         (rule (layer (- depth 1))))) 
-     start end)))
+    (let* ((maxx 640)
+           (maxy 480)
+           (s (create-sdl-context maxx maxy))
+           (context (create-cairo-context s maxx maxy))
+           (rule (lambda (draw-unit)
+                   (rule draw-unit 
+                         (lambda (point)
+                           (cairo-move-to context (car point) (cdr point)))))))
+      (cairo-move-to context (car start) (cdr start))
+      ((let layer ((depth depth))
+         (if (= depth 0)
+           (rule (lambda (current next)
+                   (cairo-line-to context (car next) (cdr next))))
+           (rule (layer (- depth 1))))) 
+         start end)
+      ; update the drawn image
+      (cairo-stroke context)
+      (sdl-flip s))
+    ; loop and wait for the user to close the window
+    (let ((event (make-sdl-event)))
+      (let loop ()
+        (sdl-wait-event! event)
+        (let ((t (sdl-event-type event)))
+          (if (= t SDL_QUIT)
+          'done
+          (loop)))))
+    (sdl-quit)))
 
 (draw-fractal 2 (cons 10 240) (cons 630 240))
-(ezx-redraw image)
-(ezx-next-event image) ; wait for user to close window
-(ezx-quit image)
 
+;(define xsize 640)
+;(define ysize 480)
+;(define s (create-sdl-context xsize ysize))
+;(define context (create-cairo-context s xsize ysize))
 
 ; ; ; simple-graphics version
 ;(use simple-graphics)
@@ -124,72 +163,3 @@
 ;(draw-fractal 5)
 ;(save)
 
-; ; ; cairo version
-;; extract the last point from a shape
-;(define shape-end
-;  (lambda (shape)
-;    (let follow-branch ((branch shape))
-;      (if (list? branch)
-;          (let ((next (car branch))
-;                (rest (cdr branch)))
-;            (if (null? rest) 
-;                (if (list? next)
-;                    (follow-branch next)
-;                    next)
-;                (begin
-;                  (follow-branch next)
-;                  (follow-branch rest))))
-;          branch))))
-;
-;; return a scaled, translated, and rotated version of shape
-;(define fit-shape
-;  (lambda (shape start end)
-;    (let ((end (fit-shape shape)))
-;      #f)))
-
-;(define cairo-apply-pair 
-;  (lambda (function pair) ; check bounds on pair?
-;    (function context (car pair) (cdr pair))))
-
-
-;(define draw-shape 
-;  (lambda (start shape)
-;    (cairo-apply-pair cairo-move-to start) 
-;    (let draw-branch ((local-start start) (branch shape))
-;      (unless (null? branch)
-;        (let ((next (car branch))
-;              (rest (cdr branch)))
-;          (if (list? next)
-;              (begin
-;                (draw-branch local-start next)
-;                (draw-shape local-start rest))
-;              (begin
-;                (cairo-apply-pair cairo-line-to next)
-;                (draw-branch next rest))))))))
-;
-;(define base
-;        (list (cons 20 10) 
-;              (list (cons 30 10) 
-;                    (cons 30 20)) 
-;              (list (cons 20 20) 
-;                    (cons 30 20) 
-;                    (cons 40 20))))
-;(define rule base)
-
-;(draw-shape '(10 . 10) base)
-;
-;(cairo-stroke context)
-;
-;(sdl-flip s)
-;
-;(let ((event (make-sdl-event)))
-;  (let loop ()
-;    (sdl-wait-event! event)
-;    (let ((t (sdl-event-type event)))
-;      (if (= t SDL_QUIT)
-;      'done
-;      (loop)))))
-;
-;(sdl-quit)
-; Represent fractals as trees of line segments.
-;
