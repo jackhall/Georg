@@ -15,16 +15,16 @@
     (let ((ab (difference A B))) 
       (cons 
         (+ 
-          (* factor
-             (-
+          (/ (-
                (* (car ab) (cos theta))
-               (* (cdr ab) (sin theta))))
+               (* (cdr ab) (sin theta)))
+             factor)
           (car A))
         (+ 
-          (* factor
-             (+
+          (/ (+
                (* (car ab) (sin theta))
-               (* (cdr ab) (cos theta))))
+               (* (cdr ab) (cos theta)))
+             factor)
           (cdr A))))))
 
 (define rotate
@@ -43,19 +43,30 @@
 (define rule
   (lambda (draw-unit move-to)
     (let ((rule-unit (sqrt 10))
-          (rule-angle (atan (/ 3))))
+          (rule-angle (- (atan (/ 3)))))
       (lambda (A B)
         (let* ((a (rotate-and-scale-down A B rule-angle rule-unit))
-               (b (rotate-and-scale-down A B (- rule-angle PI/4) rule-unit))
-               (c (rotate a b PI/2))
-               (d (rotate b a (- PI/2))))
+               (b (rotate-and-scale-down A B (+ rule-angle PI/4) (/ rule-unit (sqrt 2))))
+               (c (rotate a b (- PI/2)))
+               (d (rotate b a PI/2)))
             (draw-unit A a)
             (draw-unit a b)
             (draw-unit b d)
             (draw-unit d B) ; now move back to "a"
             (move-to a)
             (draw-unit a c)
-            (draw-unit c d))))))
+            (draw-unit c d)
+            (move-to B))))))
+
+;(define rule 
+;  (lambda (draw-unit move-to)
+;    (let ((rule-unit (sqrt 10))
+;          (rule-angle (- (atan (/ 3)))))
+;      (lambda (A B)
+;        (let* ((a (rotate-and-scale-down A B rule-angle rule-unit))
+;               (b (rotate-and-scale-down a B (+ rule-angle PI/2) rule-unit)))
+;          (draw-unit A a)
+;          (draw-unit a b))))))
 
 (define create-sdl-context
   (lambda (maxx maxy)
@@ -88,16 +99,16 @@
            (maxy 480)
            (s (create-sdl-context maxx maxy))
            (context (create-cairo-context s maxx maxy))
-           (rule (lambda (draw-unit)
-                   (rule draw-unit 
-                         (lambda (point)
-                           (cairo-move-to context (car point) (cdr point)))))))
+           (pattern (lambda (draw-unit)
+                      (rule draw-unit 
+                            (lambda (point)
+                              (cairo-move-to context (car point) (cdr point)))))))
       (cairo-move-to context (car start) (cdr start))
       ((let layer ((depth depth))
          (if (= depth 0)
-           (rule (lambda (current next)
+           (pattern (lambda (current next)
                    (cairo-line-to context (car next) (cdr next))))
-           (rule (layer (- depth 1))))) 
+           (pattern (layer (- depth 1))))) 
          start end)
       ; update the drawn image
       (cairo-stroke context)
@@ -109,10 +120,9 @@
         (let ((t (sdl-event-type event)))
           (if (= t SDL_QUIT)
           'done
-          (loop)))))
-    (sdl-quit)))
+          (loop)))))))
 
-(draw-fractal 2 (cons 10 240) (cons 630 240))
+(draw-fractal 4 (cons 10 240) (cons 630 240))
 
 ;(define xsize 640)
 ;(define ysize 480)
