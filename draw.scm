@@ -25,15 +25,15 @@
             (draw-unit (list c d))
             (move-to B)))))))
 
-(draw-fractal square-tail 4 segment
-              (let ((start (cons 10 (/ ymax 2)))
-                    (end (cons (- xmax 10) (/ ymax 2))))
-                (lambda () 
-                  (let ((image (standard-frame "square-tail.svg" (list start end))))
-                    (cairo-move-to (frame-context image) 
-                                   (car start) 
-                                   (cdr start))
-                    image))))
+;(draw-fractal square-tail 4 segment
+;              (let ((start (cons 10 (/ ymax 2)))
+;                    (end (cons (- xmax 10) (/ ymax 2))))
+;                (lambda () 
+;                  (let ((image (standard-frame "square-tail.svg" (list start end))))
+;                    (cairo-move-to (frame-context image) 
+;                                   (car start) 
+;                                   (cdr start))
+;                    image))))
 
 ; dragon
 (define dragon-curve
@@ -47,56 +47,82 @@
         (draw-unit (list C B))
         (move-to C)))))
       
-(draw-fractal dragon-curve 16 segment
-              (let ((start (cons (/ xmax 4) (/ ymax 3)))
-                    (end (cons (* xmax 7 (/ 8)) (/ ymax 3))))
-                (lambda () 
-                  (let ((image (standard-frame "dragon-curve.svg" (list start end))))
-                    (cairo-move-to (frame-context image) 
-                                   (car start) 
-                                   (cdr start))
-                    image))))
+;(draw-fractal dragon-curve 16 segment
+;              (let ((start (cons (/ xmax 4) (/ ymax 3)))
+;                    (end (cons (* xmax 7 (/ 8)) (/ ymax 3))))
+;                (lambda () 
+;                  (let ((image (standard-frame "dragon-curve.svg" (list start end))))
+;                    (cairo-move-to (frame-context image) 
+;                                   (car start) 
+;                                   (cdr start))
+;                    image))))
 
 ; windmill - doesn't quite fit together yet
+(define bisection
+  (lambda (objective A B)
+    (let* ((a (objective A))
+           (b (objective B))
+           (C (/ (+ B A) 2))
+           (c (objective C)))
+      (cond ((> (* a b) 0) #f)
+            ((< (- B A) 0.0000000001) C)
+            ((> (* c a) 0) (bisection objective C B))
+            ((> (* c b) 0) (bisection objective A C))
+            ((= c 0) C)
+            (else #f)))))
+
+(define windmill-rule-angle (/ PI 12))
+(define windmill-rule-unit 
+  (let ((gamma (bisection 
+                 (lambda (gamma)
+                   (- (* (sin (/ PI 3))
+                         (+ (/ (sin (- (/ (* PI 2) 3) 
+                                       windmill-rule-angle)))
+                            (/ (sin (- (/ (* PI 2) 3)
+                                       windmill-rule-angle
+                                       gamma))
+                               (* (sin (+ (/ PI 3) 
+                                          windmill-rule-angle))
+                                  (sin (+ (/ PI 3)
+                                          windmill-rule-angle
+                                          gamma))))))
+                      (/ (sin (- PI
+                                 windmill-rule-angle
+                                 gamma))
+                         (sin gamma))))
+                 0.0001 1))) ; starting interval (radians)
+    (/ (sin (- PI windmill-rule-angle gamma)) ; compute rule-unit from gamma
+       (sin gamma))))
+
 (define open-triangle
   (lambda (context reference-points)
     (let ((A (list-ref reference-points 0))
           (B (list-ref reference-points 1))
           (C (list-ref reference-points 2)))
-      (let* ((long-angle (* 5 PI (/ 6)))
-             (long-side (sqrt (+ 3 4 (- (* 4 SQRT3 (cos long-angle))))))
-             (rule-angle (asin (* (/ SQRT3 long-side) (sin long-angle))))
-             (short-side (/ (sin (+ (/ PI 3)
-                                    rule-angle))
-                            (sin (- (/ PI 3)
-                                    rule-angle)))))
+      (let ((C-prime (scale-down A C (/ windmill-rule-unit))))
         (segment context (list A B))
-        (segment context (list B (scale-down B C short-side)))))))
+        (segment context (list B (rotate-and-scale-down C-prime A windmill-rule-angle windmill-rule-unit)))))))
 
 (define windmill
   (lambda (draw-unit move-to)
-    (let* ((long-angle (* 5 PI (/ 6)))
-           (long-side (sqrt (+ 3 4 (- (* 4 SQRT3 (cos long-angle))))))
-           (rule-unit (/ long-side 2))
-           (rule-angle (asin (* (/ SQRT3 long-side) (sin long-angle)))))
-      (lambda (reference-points)
-        (let ((A (list-ref reference-points 0))
-              (B (list-ref reference-points 1))
-              (C (list-ref reference-points 2)))
-          (let ((a (rotate-and-scale-down A B rule-angle rule-unit))
-                (b (rotate-and-scale-down B C rule-angle rule-unit))
-                (c (rotate-and-scale-down C A rule-angle rule-unit)))
-            (let ((e (scale-down a c 0.5))
-                  (f (scale-down b a 0.5))
-                  (g (scale-down c b 0.5)))
-              (move-to A)
-              (draw-unit (list A a e))
-              (move-to B)
-              (draw-unit (list B b f))
-              (move-to C)
-              (draw-unit (list C c g)))))))))
+    (lambda (reference-points)
+      (let ((A (list-ref reference-points 0))
+            (B (list-ref reference-points 1))
+            (C (list-ref reference-points 2)))
+        (let ((a (rotate-and-scale-down A B windmill-rule-angle windmill-rule-unit))
+              (b (rotate-and-scale-down B C windmill-rule-angle windmill-rule-unit))
+              (c (rotate-and-scale-down C A windmill-rule-angle windmill-rule-unit)))
+          (let ((e (rotate A a (/ PI 3)))
+                (f (rotate B b (/ PI 3)))
+                (g (rotate C c (/ PI 3))))
+            (move-to A)
+            (draw-unit (list A a e))
+            (move-to B)
+            (draw-unit (list B b f))
+            (move-to C)
+            (draw-unit (list C c g))))))))
 
-(draw-fractal windmill 8 open-triangle
+(draw-fractal windmill 0 open-triangle
               (let ((A (cons (/ xmax 2) 
                              10))
                     (B (cons (+ (/ xmax 2) 
