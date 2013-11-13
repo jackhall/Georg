@@ -71,70 +71,75 @@
             ((= c 0) C)
             (else #f)))))
 
-(define windmill-rule-angle (/ PI 12))
-(define windmill-rule-unit 
-  (let ((gamma (bisection 
-                 (lambda (gamma)
-                   (- (* (sin (/ PI 3))
-                         (+ (/ (sin (- (/ (* PI 2) 3) 
-                                       windmill-rule-angle)))
-                            (/ (sin (- (/ (* PI 2) 3)
-                                       windmill-rule-angle
-                                       gamma))
-                               (* (sin (+ (/ PI 3) 
-                                          windmill-rule-angle))
-                                  (sin (+ (/ PI 3)
-                                          windmill-rule-angle
-                                          gamma))))))
-                      (/ (sin (- PI
-                                 windmill-rule-angle
-                                 gamma))
-                         (sin gamma))))
-                 0.0001 1))) ; starting interval (radians)
-    (/ (sin (- PI windmill-rule-angle gamma)) ; compute rule-unit from gamma
-       (sin gamma))))
+(define windmill-rule-angle (/ PI 18))
+(define windmill-gamma 
+  (bisection 
+    (lambda (gamma)
+      (- (* (sin (/ PI 3))
+            (+ (/ (sin (- (/ (* PI 2) 3) 
+                          windmill-rule-angle)))
+               (/ (sin (- (/ (* PI 2) 3)
+                          windmill-rule-angle
+                          gamma))
+                  (* (sin (+ (/ PI 3) 
+                             windmill-rule-angle))
+                     (sin (+ (/ PI 3)
+                             windmill-rule-angle
+                             gamma))))))
+         (/ (sin (- PI
+                    windmill-rule-angle
+                    gamma))
+            (sin gamma))))
+    0.0001 1)) ; starting interval (radians)
+(define windmill-rule-unit
+  (/ (sin (- PI windmill-rule-angle windmill-gamma)) ; compute rule-unit from gamma
+     (sin windmill-gamma)))
+(define windmill-small-side
+  (let ((beta (- (/ PI 3) windmill-rule-angle windmill-gamma)))
+    (* windmill-rule-unit
+       (/ (sin beta))
+       (sin (- (* 2 (/ PI 3)) beta)))))
 
 (define open-triangle
   (lambda (context reference-points)
     (let ((A (list-ref reference-points 0))
           (B (list-ref reference-points 1))
-          (C (list-ref reference-points 2)))
-      (let ((C-prime (scale-down A C (/ windmill-rule-unit))))
-        (segment context (list A B))
-        (segment context (list B (rotate-and-scale-down C-prime A windmill-rule-angle windmill-rule-unit)))))))
+          (c (list-ref reference-points 2)))
+      (segment context (list A B))
+      (segment context (list B c)))))
 
 (define windmill
   (lambda (draw-unit move-to)
     (lambda (reference-points)
       (let ((A (list-ref reference-points 0))
-            (B (list-ref reference-points 1))
-            (C (list-ref reference-points 2)))
-        (let ((a (rotate-and-scale-down A B windmill-rule-angle windmill-rule-unit))
-              (b (rotate-and-scale-down B C windmill-rule-angle windmill-rule-unit))
-              (c (rotate-and-scale-down C A windmill-rule-angle windmill-rule-unit)))
-          (let ((e (rotate A a (/ PI 3)))
-                (f (rotate B b (/ PI 3)))
-                (g (rotate C c (/ PI 3))))
+            (B (list-ref reference-points 1)))
+        (let* ((C (rotate A B (/ PI 3)))
+               (a (rotate-and-scale-down A B windmill-rule-angle windmill-rule-unit))
+               (b (rotate-and-scale-down B C windmill-rule-angle windmill-rule-unit))
+               (c (rotate-and-scale-down C A windmill-rule-angle windmill-rule-unit))
+               (e (rotate A a (/ PI 3)))
+               (f (rotate B b (/ PI 3)))
+               (g (rotate C c (/ PI 3))))
             (move-to A)
-            (draw-unit (list A a e))
+            (draw-unit (list A a c))
             (move-to B)
-            (draw-unit (list B b f))
+            (draw-unit (list B b a))
             (move-to C)
-            (draw-unit (list C c g))))))))
+            (draw-unit (list C c b)))))))
 
-(draw-fractal windmill 0 open-triangle
+(draw-fractal windmill 1 open-triangle
               (let ((A (cons (/ xmax 2) 
                              10))
                     (B (cons (+ (/ xmax 2) 
                                 (/ (- ymax 210)
                                    SQRT3))
-                             (- ymax 200)))
-                    (C (cons (- (/ xmax 2)
-                                (/ (- ymax 210)
-                                   SQRT3))
                              (- ymax 200))))
                 (lambda ()
-                  (standard-frame "windmill.svg" (list A B C)))))
+                  (standard-frame "windmill.svg" 
+                                  (list A B (rotate-and-scale-down B 
+                                                                   A 
+                                                                   (- (/ PI 3)) 
+                                                                   windmill-small-side))))))
 
 
 ; not working
