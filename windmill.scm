@@ -4,59 +4,6 @@
 (include "mathh-constants")
 (load "fractal.scm")
 
-; square-tail
-(define square-tail
-  (lambda (draw-unit move-to)
-    (let ((rule-unit (sqrt (+ (expt 3 2) (expt 1 2))))
-          (rule-angle (- (atan (/ 1 3)))))
-      (lambda (reference-points)
-        (let ((A (list-ref reference-points 0))
-              (B (list-ref reference-points 1)))
-          (let* ((a (rotate-and-scale-down A B rule-angle rule-unit))
-                 (b (rotate-and-scale-down A B (+ rule-angle PI/4) (/ rule-unit (sqrt 2))))
-                 (c (rotate a b (- PI/2)))
-                 (d (rotate b a PI/2)))
-            (draw-unit (list A a))
-            (draw-unit (list a b))
-            (draw-unit (list b d))
-            (draw-unit (list d B))
-            (move-to a)
-            (draw-unit (list a c))
-            (draw-unit (list c d))
-            (move-to B)))))))
-
-;(draw-fractal square-tail 4 segment
-;              (let ((start (cons 10 (/ ymax 2)))
-;                    (end (cons (- xmax 10) (/ ymax 2))))
-;                (lambda () 
-;                  (let ((image (standard-frame "square-tail.svg" (list start end))))
-;                    (cairo-move-to (frame-context image) 
-;                                   (car start) 
-;                                   (cdr start))
-;                    image))))
-
-; dragon
-(define dragon-curve
-  (lambda (draw-unit move-to)
-    (lambda (reference-points)
-      (let* ((A (list-ref reference-points 0))
-             (C (list-ref reference-points 1))
-             (B (rotate-and-scale-down A C PI/4 SQRT2)))
-        (draw-unit (list A B))
-        (move-to C)
-        (draw-unit (list C B))
-        (move-to C)))))
-      
-;(draw-fractal dragon-curve 16 segment
-;              (let ((start (cons (/ xmax 4) (/ ymax 3)))
-;                    (end (cons (* xmax 7 (/ 8)) (/ ymax 3))))
-;                (lambda () 
-;                  (let ((image (standard-frame "dragon-curve.svg" (list start end))))
-;                    (cairo-move-to (frame-context image) 
-;                                   (car start) 
-;                                   (cdr start))
-;                    image))))
-
 ; windmill - doesn't quite fit together yet
 (define bisection
   (lambda (objective A B)
@@ -127,7 +74,7 @@
             (move-to C)
             (draw-unit (list C c b)))))))
 
-(draw-fractal windmill 1 open-triangle
+(draw-fractal windmill 8 open-triangle
               (let ((A (cons (/ xmax 2) 
                              10))
                     (B (cons (+ (/ xmax 2) 
